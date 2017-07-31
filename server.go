@@ -2,17 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"time"
 )
-
-type Tile struct {
-	Index  uint16 `json:"index"`
-	Owner  uint8  `json:"owner"`
-	Troops uint32 `json:"troops"`
-}
 
 type Packet struct {
 	Tiles  []Tile `json:"tiles"`
@@ -151,6 +147,19 @@ func startClock() {
 }
 
 func main() {
+	file := flag.String("m", "maps/new-york.json", "The map that the server will run.")
+	flag.Parse()
+
+	level, err := ioutil.ReadFile(*file)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Map selected:", *file)
+
+	var game *Map
+	json.Unmarshal(level, &game)
+	fmt.Println(game)
+
 	fmt.Println("Starting server")
 
 	clients = make(map[int]*Client)

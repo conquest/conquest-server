@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 )
 
 type Tile struct {
@@ -79,6 +80,11 @@ func (client *Client) Listen() {
 	go client.Write()
 }
 
+// TODO client sync on join
+func (client *Client) Sync() {
+	return
+}
+
 func NewClient(conn net.Conn) *Client {
 	decode := json.NewDecoder(conn)
 
@@ -90,6 +96,58 @@ func NewClient(conn net.Conn) *Client {
 	client.Listen()
 
 	return client
+}
+
+func broadcast(msg []byte) {
+	for _, client := range clients {
+		client.Conn.Write(msg)
+	}
+}
+
+func clockTime(time int) (ct string) {
+	ct = ""
+	if time/60 < 10 {
+		ct += "0"
+	}
+	ct += fmt.Sprintf("%d:", time/60)
+	if time%60 < 10 {
+		ct += "0"
+	}
+	ct += fmt.Sprintf("%d", time%60)
+
+	return
+}
+
+func startClock() {
+	clock := time.NewTicker(time.Second)
+	refresh := time.NewTicker(10 * time.Second)
+
+	go func() {
+		time := 0
+		for range clock.C {
+			if len(clients) == 0 {
+				clock.Stop()
+				return
+			}
+
+			time++
+			msg := clockTime(time) + "\n"
+			fmt.Print(msg)
+			go broadcast([]byte(msg))
+		}
+	}()
+
+	go func() {
+		for range refresh.C {
+			if len(clients) == 0 {
+				refresh.Stop()
+				return
+			}
+
+			fmt.Println("refresh")
+			go broadcast([]byte("refresh\n"))
+		}
+	}()
 }
 
 func main() {
@@ -111,6 +169,11 @@ func main() {
 		client := NewClient(conn)
 		clients[len(clients)] = client
 		client.Id = uint8(len(clients))
+		client.Sync()
 		fmt.Println("New client with id:", client.Id)
+
+		if len(clients) == 1 {
+			startClock()
+		}
 	}
 }

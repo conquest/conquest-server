@@ -42,6 +42,11 @@ func (client *Client) Read() {
 			client.Conn.Close()
 			client.Running = false
 			delete(clients, int(client.Id)-1)
+
+			if len(clients) == 0 {
+				game.Reset()
+			}
+
 			fmt.Println("Client disconnected with id:", client.Id)
 			return
 		} else {
@@ -52,10 +57,7 @@ func (client *Client) Read() {
 }
 
 func (client *Client) Write() {
-	for {
-		if !client.Running {
-			return
-		}
+	for client.Running {
 		for _, cl := range clients {
 			if !cl.Pack.IsEmpty() {
 				var data []byte
@@ -76,9 +78,10 @@ func (client *Client) Listen() {
 	go client.Write()
 }
 
-// TODO client sync on join
 func (client *Client) Sync() {
-	return
+	latest, _ := json.Marshal(game)
+	latest = append(latest, []byte("\n")...)
+	client.Conn.Write(latest)
 }
 
 func NewClient(conn net.Conn) *Client {
@@ -89,6 +92,7 @@ func NewClient(conn net.Conn) *Client {
 		Decoder: decode,
 		Running: true,
 	}
+	client.Sync()
 	client.Listen()
 
 	return client
@@ -142,9 +146,12 @@ func startClock() {
 
 			fmt.Println("refresh")
 			go broadcast([]byte("refresh\n"))
+			game.Update()
 		}
 	}()
 }
+
+var game *Map
 
 func main() {
 	file := flag.String("m", "maps/new-york.json", "The map that the server will run.")
@@ -156,9 +163,8 @@ func main() {
 	}
 	fmt.Println("Map selected:", *file)
 
-	var game *Map
 	json.Unmarshal(level, &game)
-	fmt.Println(game)
+	game.Initialize()
 
 	fmt.Println("Starting server")
 
@@ -178,7 +184,6 @@ func main() {
 		client := NewClient(conn)
 		clients[len(clients)] = client
 		client.Id = uint8(len(clients))
-		client.Sync()
 		fmt.Println("New client with id:", client.Id)
 
 		if len(clients) == 1 {

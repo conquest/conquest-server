@@ -17,7 +17,8 @@ type Tile struct {
 	Width  uint `json:"w"`
 	Height uint `json:"h"`
 
-	City *City `json:"city,omitempty"`
+	City   *City  `json:"city,omitempty"`
+	Region string `json:"region,omitempty"`
 }
 
 type Region struct {
@@ -67,4 +68,17 @@ func (m *Map) Reset() {
 		}
 	}
 
+}
+
+func (m *Map) Read(tiles []Tile) {
+	for _, tile := range tiles {
+		reg := m.Regions[tile.Region]
+		for _, t := range reg.Tiles {
+			if tile.Index == t.Index {
+				t.Owner = tile.Owner
+				t.Troops = tile.Troops
+				break
+			}
+		}
+	}
 }

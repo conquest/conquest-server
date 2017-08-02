@@ -52,6 +52,7 @@ func (client *Client) Read() {
 		} else {
 			client.Pack = pack
 			client.Pack.Player.Id = client.Id
+			go game.Read(client.Pack.Tiles)
 		}
 	}
 }

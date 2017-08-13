@@ -102,7 +102,6 @@ func (client *Client) Read() {
 		} else {
 			client.Pack = pack
 			client.Pack.Player.Id = client.Id
-			fmt.Println(client.Pack)
 			go game.Read(client.Pack.Block)
 			go client.Write()
 		}

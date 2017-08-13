@@ -54,7 +54,11 @@ func (m *Map) Update() {
 					t.Troops += 2
 				}
 			}
-			t.Troops += 2
+			if t.Owner == 0 {
+				t.Troops += 2
+			} else {
+				t.Troops += 3
+			}
 		}
 	}
 }
@@ -70,15 +74,13 @@ func (m *Map) Reset() {
 
 }
 
-func (m *Map) Read(tiles []Tile) {
-	for _, tile := range tiles {
-		reg := m.Regions[tile.Region]
-		for _, t := range reg.Tiles {
-			if tile.Index == t.Index {
-				t.Owner = tile.Owner
-				t.Troops = tile.Troops
-				break
-			}
+func (m *Map) Read(tile Tile) {
+	reg := m.Regions[tile.Region]
+	for i := range reg.Tiles {
+		if tile.Index == reg.Tiles[i].Index {
+			reg.Tiles[i].Owner = tile.Owner
+			reg.Tiles[i].Troops = tile.Troops
+			return
 		}
 	}
 }

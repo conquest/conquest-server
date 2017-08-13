@@ -16,12 +16,10 @@ type ClientMap struct {
 	items map[int]*Client
 }
 
-func NewClientMap() (cmap *ClientMap) {
-	cmap = &ClientMap{
+func NewClientMap() *ClientMap {
+	return &ClientMap{
 		items: make(map[int]*Client),
 	}
-
-	return
 }
 
 func (cmap *ClientMap) Get(key int) (c *Client, ok bool) {
@@ -67,24 +65,23 @@ func (cmap *ClientMap) Iter() <-chan *Client {
 }
 
 type Packet struct {
-	Tiles  []Tile `json:"tiles"`
+	Block  Tile `json:"tile"`
 	Player struct {
-		Id      uint8  `json:"id"`
-		Color   string `json:"color"`
-		Capital Tile   `json:"capital"`
+		Id    int    `json:"id"`
+		Color string `json:"color"`
 	} `json:"player"`
-}
-
-func (pack Packet) IsEmpty() bool {
-	return pack.Tiles == nil
 }
 
 type Client struct {
 	Conn    net.Conn
 	Decoder *json.Decoder
 	Pack    Packet
-	Running bool
-	Id      uint8
+	Id      int
+}
+
+func message(msg interface{}) []byte {
+	mar, _ := json.Marshal(msg)
+	return append(mar, []byte("\n")...)
 }
 
 func (client *Client) Read() {
@@ -94,8 +91,7 @@ func (client *Client) Read() {
 
 		if err != nil {
 			client.Conn.Close()
-			client.Running = false
-			clients.Delete(int(client.Id) - 1)
+			clients.Delete(client.Id)
 
 			if clients.Len() == 0 {
 				game.Reset()
@@ -106,36 +102,30 @@ func (client *Client) Read() {
 		} else {
 			client.Pack = pack
 			client.Pack.Player.Id = client.Id
-			go game.Read(client.Pack.Tiles)
+			fmt.Println(client.Pack)
+			go game.Read(client.Pack.Block)
+			go client.Write()
 		}
 	}
 }
 
 func (client *Client) Write() {
-	for client.Running {
-		for cl := range clients.Iter() {
-			if !cl.Pack.IsEmpty() {
-				var data []byte
-				if cl == client {
-					data, _ = json.Marshal(cl.Pack.Player)
-				} else {
-					data, _ = json.Marshal(cl.Pack)
-				}
-				data = append(data, []byte("\n")...)
-				client.Conn.Write(data)
-			}
-		}
-	}
-}
-
-func (client *Client) Listen() {
-	go client.Read()
-	go client.Write()
+	data := message(client.Pack)
+	go broadcast(data)
 }
 
 func (client *Client) sync() {
-	latest, _ := json.Marshal(game)
-	latest = append(latest, []byte("\n")...)
+	us := message(client.Id)
+	client.Conn.Write(us)
+
+	for cl := range clients.Iter() {
+		if cl != client {
+			opps := message(cl.Pack.Player)
+			client.Conn.Write(opps)
+		}
+	}
+
+	latest := message(game)
 	client.Conn.Write(latest)
 }
 
@@ -145,10 +135,11 @@ func NewClient(conn net.Conn) *Client {
 	client := &Client{
 		Conn:    conn,
 		Decoder: decode,
-		Running: true,
+		Id:      id,
 	}
+	id++
 	client.sync()
-	client.Listen()
+	go client.Read()
 
 	return client
 }
@@ -182,6 +173,7 @@ func startClock() {
 		for range clock.C {
 			if clients.Len() == 0 {
 				clock.Stop()
+				fmt.Println("Clock has stopped")
 				return
 			}
 
@@ -196,6 +188,7 @@ func startClock() {
 		for range refresh.C {
 			if clients.Len() == 0 {
 				refresh.Stop()
+				fmt.Println("Refreshing has stopped")
 				return
 			}
 
@@ -207,6 +200,7 @@ func startClock() {
 }
 
 var (
+	id      = 1
 	game    *Map
 	clients = NewClientMap()
 )
@@ -240,8 +234,7 @@ func main() {
 		}
 
 		client := NewClient(conn)
-		clients.Set(clients.Len(), client)
-		client.Id = uint8(clients.Len())
+		clients.Set(client.Id, client)
 		fmt.Println("New client with id:", client.Id)
 
 		if clients.Len() == 1 {

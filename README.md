@@ -7,5 +7,5 @@ The server for the game `conquest`.
 The default map is `new-york.json`.
 ```sh
 $ go build
-$ ./conquest-server -m=MAP_DIR/map.json
+$ ./conquest-server -m=MAP_DIR/map.json -p=PORT
 ```

@@ -206,6 +206,7 @@ var (
 
 func main() {
 	file := flag.String("m", "maps/new-york.json", "The map that the server will run.")
+	port := flag.String("p", "8080", "The port that the server will be open on.")
 	flag.Parse()
 
 	level, err := ioutil.ReadFile(*file)
@@ -220,7 +221,7 @@ func main() {
 	fmt.Println("Starting server")
 
 	clients = NewClientMap()
-	l, err := net.Listen("tcp", ":8080")
+	l, err := net.Listen("tcp", ":"+*port)
 	if err != nil {
 		log.Fatal(err)
 	}
